@@ -8,5 +8,5 @@ spec:
   dnsNames:
     - argocd.blinde.net
   issuerRef:
-    name: letsencrypt-staging
+    name: letsencrypt-prod
     kind: ClusterIssuer
