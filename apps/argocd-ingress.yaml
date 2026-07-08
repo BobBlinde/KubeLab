@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cert-manager-issuers
+  name: argocd-ingress
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -11,11 +11,11 @@ spec:
   source:
     repoURL: https://github.com/BobBlinde/KubeLab.git
     targetRevision: main
-    path: manifests/cert-manager-issuers
+    path: manifests/argocd-ingress
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: cert-manager
+    namespace: argocd
 
   syncPolicy:
     automated:
