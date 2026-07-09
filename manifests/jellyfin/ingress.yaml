@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jellyfin
+  namespace: jellyfin
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - jellyfin.blinde.net
+      secretName: jellyfin-tls
+  rules:
+    - host: jellyfin.blinde.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jellyfin
+                port:
+                  number: 80
