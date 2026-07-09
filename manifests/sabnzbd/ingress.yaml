@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sabnzbd
+  namespace: sabnzbd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - sabnzbd.blinde.net
+      secretName: sabnzbd-tls
+  rules:
+    - host: sabnzbd.blinde.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sabnzbd
+                port:
+                  number: 80

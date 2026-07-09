@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: seerr
+  namespace: seerr
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - seerr.blinde.net
+      secretName: seerr-tls
+  rules:
+    - host: seerr.blinde.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: seerr
+                port:
+                  number: 80

@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prowlarr
+  namespace: prowlarr
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - prowlarr.blinde.net
+      secretName: prowlarr-tls
+  rules:
+    - host: prowlarr.blinde.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prowlarr
+                port:
+                  number: 80
