@@ -1,0 +1,87 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: immich
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://immich-app.github.io/immich-charts
+      chart: immich
+      targetRevision: 0.12.0
+      helm:
+        values: |
+          immich:
+            persistence:
+              library:
+                existingClaim: immich-library
+
+          valkey:
+            enabled: true
+
+          machine-learning:
+            persistence:
+              cache:
+                enabled: true
+                type: persistentVolumeClaim
+                size: 5Gi
+                accessMode: ReadWriteOnce
+                storageClass: local-path
+
+          server:
+            controllers:
+              main:
+                containers:
+                  main:
+                    env:
+                      DB_HOSTNAME: immich-postgres
+                      DB_PORT: "5432"
+                      DB_USERNAME:
+                        valueFrom:
+                          secretKeyRef:
+                            name: immich-db
+                            key: username
+                      DB_PASSWORD:
+                        valueFrom:
+                          secretKeyRef:
+                            name: immich-db
+                            key: password
+                      DB_DATABASE_NAME:
+                        valueFrom:
+                          secretKeyRef:
+                            name: immich-db
+                            key: database
+            ingress:
+              main:
+                enabled: true
+                className: traefik
+                annotations:
+                  nginx.ingress.kubernetes.io/proxy-body-size: null
+                hosts:
+                  - host: immich.blinde.net
+                    paths:
+                      - path: "/"
+                        service:
+                          identifier: main
+                tls:
+                  - hosts:
+                      - immich.blinde.net
+                    secretName: immich-tls
+
+    - repoURL: https://github.com/BobBlinde/KubeLab.git
+      targetRevision: main
+      path: manifests/immich
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: immich
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

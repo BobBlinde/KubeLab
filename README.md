@@ -29,6 +29,37 @@ Also update the placeholder email in
 before applying — consider using a non-personal/alias address rather than
 committing your real one.
 
+### Immich
+
+The `immich` Application (`apps/immich.yaml`) is a multi-source ArgoCD app:
+the official Helm chart (`immich-app/immich-charts`) provides the
+server/machine-learning/valkey deployments and the Ingress, while
+`manifests/immich` supplies the pieces the chart doesn't manage — Postgres
+(the chart dropped its Postgres subchart) and the photo/video library
+storage.
+
+The library still lives at `/data/immich` on the node, same as before, but
+the chart requires an existing PVC rather than a raw hostPath, so
+`manifests/immich/library-pv.yaml` + `library-pvc.yaml` wrap that hostPath
+in a statically-provisioned PV/PVC pair (`storageClassName: manual`) that
+the chart's `immich.persistence.library.existingClaim` points at. The PV
+pins to node `kubrick` via node affinity — update that if the cluster
+gains more nodes. Make sure `/data/immich` exists and has room before
+syncing.
+
+Immich's Postgres deployment and the chart-managed server container read
+their DB credentials from an `immich-db` secret that isn't stored in git
+(same reasoning as the Cloudflare token above). Create it before syncing
+the `immich` Application:
+
+```bash
+kubectl create secret generic immich-db \
+  --namespace immich \
+  --from-literal=username=immich \
+  --from-literal=password=YOUR_STRONG_PASSWORD \
+  --from-literal=database=immich
+```
+
 ### ArgoCD Ingress (argocd.blinde.net)
 
 ArgoCD is exposed via TLS passthrough rather than edge termination, so
