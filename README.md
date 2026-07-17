@@ -55,10 +55,27 @@ the `immich` Application:
 ```bash
 kubectl create secret generic immich-db \
   --namespace immich \
-  --from-literal=username=immich \
+  --from-literal=username=postgres \
   --from-literal=password=YOUR_STRONG_PASSWORD \
   --from-literal=database=immich
 ```
+
+`username=postgres` matches Immich's own documented default, so a
+`pg_dumpall`/`pg_restore` backup taken from a typical Immich instance
+(including the official backup docs' example) restores here without
+needing to pre-create a role or reassign object ownership.
+
+The Immich app version is pinned via the root-level
+`controllers.main.containers.main.image.tag` value in
+`apps/immich.yaml` (shared by both the server and machine-learning
+components), independent of the chart's `targetRevision`. The chart
+maintainers jumped straight from appVersion `v2.6.3` (chart `0.12.0`) to
+`v3.0.0` (chart `0.12.1`+) with no chart release in between, so
+intermediate Immich versions have to be pinned this way on top of the last
+chart release for the `v2.x` line rather than by bumping the chart
+version. Before bumping past `v3.0.0`, check the chart's release notes —
+newer chart versions may expect config that doesn't exist in `0.12.0`'s
+templates.
 
 ### ArgoCD Ingress (argocd.blinde.net)
 
