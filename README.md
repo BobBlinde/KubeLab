@@ -66,16 +66,28 @@ kubectl create secret generic immich-db \
 needing to pre-create a role or reassign object ownership.
 
 The Immich app version is pinned via the root-level
-`controllers.main.containers.main.image.tag` value in
-`apps/immich.yaml` (shared by both the server and machine-learning
-components), independent of the chart's `targetRevision`. The chart
-maintainers jumped straight from appVersion `v2.6.3` (chart `0.12.0`) to
-`v3.0.0` (chart `0.12.1`+) with no chart release in between, so
-intermediate Immich versions have to be pinned this way on top of the last
-chart release for the `v2.x` line rather than by bumping the chart
-version. Before bumping past `v3.0.0`, check the chart's release notes —
-newer chart versions may expect config that doesn't exist in `0.12.0`'s
-templates.
+`controllers.main.containers.main.image.tag` value in `apps/immich.yaml`
+(shared by both the server and machine-learning components), independent
+of the chart's `targetRevision` — the chart does not track every Immich
+release, so bumping Immich almost never means bumping the chart too.
+
+The chart source is the OCI registry (`oci://ghcr.io/immich-app/immich-charts/immich`),
+not the old `https://immich-app.github.io/immich-charts` HTTP repo — the
+maintainers retired that HTTP repo after chart `0.12.0` and publish only to
+OCI now, so the HTTP repo's `index.yaml` is permanently stuck at `0.12.0`
+and any chart `targetRevision` newer than that will fail to resolve
+against it.
+
+Immich v3 dropped `pgvecto.rs` support entirely (VectorChord is now the
+only supported vector extension), but that only matters for instances
+that hadn't already migrated to VectorChord on a pre-v1.133.0 install —
+our Postgres image already ran VectorChord, so no database migration step
+was needed there. The v3.0.3 upgrade did bump the recommended Postgres
+image to `ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0`
+(VectorChord `0.3.0` → `0.4.3`) in `manifests/immich/postgres-deployment.yaml`
+— `immich-server` detects and applies the extension version bump itself on
+startup, no manual `ALTER EXTENSION` needed, but take a fresh `pg_dumpall`
+backup before syncing a Postgres image bump regardless.
 
 ### ArgoCD Ingress (argocd.blinde.net)
 
