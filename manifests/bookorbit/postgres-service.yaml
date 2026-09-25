@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bookorbit-postgres
+  namespace: bookorbit
+spec:
+  selector:
+    app: bookorbit-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

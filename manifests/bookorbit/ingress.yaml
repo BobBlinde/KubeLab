@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bookorbit
+  namespace: bookorbit
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - bookorbit.blinde.net
+      secretName: bookorbit-tls
+  rules:
+    - host: bookorbit.blinde.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: bookorbit
+                port:
+                  number: 80
