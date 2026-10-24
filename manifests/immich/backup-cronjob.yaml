@@ -1,0 +1,102 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: immich-backup
+  namespace: immich
+spec:
+  # Sundays 04:00 UTC, after Immich's own 02:00 database dump into /data/backups
+  schedule: "0 4 * * 0"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          initContainers:
+            # The restic image doesn't ship rclone, which restic needs for the OneDrive backend
+            - name: rclone
+              image: rclone/rclone:1.75.2
+              command: ["cp", "/usr/local/bin/rclone", "/tools/rclone"]
+              volumeMounts:
+                - name: tools
+                  mountPath: /tools
+          containers:
+            - name: restic
+              image: restic/restic:0.19.1
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  # rclone rewrites its config when it refreshes the OneDrive token,
+                  # so it needs a writable copy that survives between runs
+                  mkdir -p /state/rclone
+                  [ -f "$RCLONE_CONFIG" ] || cp /secret/rclone.conf "$RCLONE_CONFIG"
+
+                  # No repo password: access to the OneDrive account is the only protection
+                  restic() { command restic --insecure-no-password "$@"; }
+
+                  restic cat config >/dev/null 2>&1 || restic init
+
+                  # Exit code 3 means the snapshot was saved but some files vanished or
+                  # changed mid-read (Immich does that during uploads); next run picks them up
+                  rc=0
+                  restic backup /data \
+                    --host immich \
+                    --exclude /data/thumbs \
+                    --exclude /data/encoded-video \
+                    --exclude /data/photos/thumbs \
+                    --exclude /data/photos/encoded-video || rc=$?
+                  if [ "$rc" -eq 3 ]; then
+                    echo "WARNING: some files could not be read; snapshot was still saved"
+                  elif [ "$rc" -ne 0 ]; then
+                    exit "$rc"
+                  fi
+
+                  restic forget --host immich --keep-weekly 8 --keep-monthly 12 --prune
+                  restic check --read-data-subset=1%
+              env:
+                - name: PATH
+                  value: /tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+                - name: RESTIC_REPOSITORY
+                  value: rclone:onedrive:kubelab-backups/immich
+                - name: RESTIC_CACHE_DIR
+                  value: /state/cache
+                - name: RCLONE_CONFIG
+                  value: /state/rclone/rclone.conf
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 512Mi
+                limits:
+                  memory: 2Gi
+              volumeMounts:
+                - name: library
+                  mountPath: /data
+                  readOnly: true
+                - name: state
+                  mountPath: /state
+                - name: rclone-secret
+                  mountPath: /secret
+                  readOnly: true
+                - name: tools
+                  mountPath: /tools
+          volumes:
+            - name: library
+              persistentVolumeClaim:
+                claimName: immich-library
+                readOnly: true
+            - name: state
+              persistentVolumeClaim:
+                claimName: immich-backup-state
+            - name: rclone-secret
+              secret:
+                secretName: rclone-onedrive
+                items:
+                  - key: rclone.conf
+                    path: rclone.conf
+            - name: tools
+              emptyDir: {}

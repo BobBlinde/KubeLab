@@ -89,6 +89,67 @@ image to `ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0`
 startup, no manual `ALTER EXTENSION` needed, but take a fresh `pg_dumpall`
 backup before syncing a Postgres image bump regardless.
 
+#### Backups (weekly, to OneDrive)
+
+`manifests/immich/backup-cronjob.yaml` runs [restic](https://restic.net)
+every Sunday at 04:00 UTC and backs up the library volume (`/data/immich`
+on the node) to a restic repo in OneDrive (folder `kubelab-backups/immich`), using
+rclone as restic's OneDrive backend. The repo deliberately has no password
+(`--insecure-no-password`), so anyone with access to the OneDrive account
+can read the backup. The database
+is covered by the same snapshot: Immich's built-in database backup
+(Administration → Settings → Backup) writes a daily `pg_dump` to
+`/data/immich/backups` at 02:00, so keep that enabled. `thumbs/` and
+`encoded-video/` are excluded because Immich can regenerate them.
+Retention is 8 weekly + 12 monthly snapshots.
+
+One-time setup:
+
+1. On a machine with a browser, run `rclone config`, add a remote named
+   exactly `onedrive` (type `onedrive`) and log in. This writes
+   `~/.config/rclone/rclone.conf`.
+2. Create the secret:
+
+   ```bash
+   kubectl create secret generic rclone-onedrive \
+     --namespace immich \
+     --from-file=rclone.conf=$HOME/.config/rclone/rclone.conf
+   ```
+
+   The secret is named generically because other services' backup jobs
+   can reuse the same OneDrive login. Secrets are namespaced, though, so
+   create a copy in each namespace that gets a backup job. Give each
+   service its own restic repo under `kubelab-backups/` (e.g.
+   `rclone:onedrive:kubelab-backups/bookorbit`).
+
+3. Start the first run instead of waiting for Sunday. This first upload
+   is the slow one:
+
+   ```bash
+   kubectl -n immich create job --from=cronjob/immich-backup immich-backup-manual
+   kubectl -n immich logs -f job/immich-backup-manual
+   ```
+
+On its first run the job copies `rclone.conf` from the secret onto the
+`immich-backup-state` PVC, because rclone has to write refreshed OneDrive
+tokens back to it. That means **updating the secret won't take effect** by
+itself. If you re-authorize OneDrive, also delete the PVC copy (it gets
+recreated from the secret on the next run):
+
+```bash
+kubectl -n immich run rm-rclone --rm -it --restart=Never --image=busybox \
+  --overrides='{"spec":{"volumes":[{"name":"s","persistentVolumeClaim":{"claimName":"immich-backup-state"}}],"containers":[{"name":"c","image":"busybox","command":["rm","/s/rclone/rclone.conf"],"volumeMounts":[{"name":"s","mountPath":"/s"}]}]}}'
+```
+
+The OneDrive token stays valid as long as the job runs at least once
+every 90 days, which the weekly schedule easily covers.
+
+To restore, run restic anywhere rclone has the same remote configured,
+e.g. `restic --insecure-no-password -r rclone:onedrive:kubelab-backups/immich snapshots`
+and `restic --insecure-no-password -r rclone:onedrive:kubelab-backups/immich restore latest --target ./restore`.
+To get the database back, load the newest `backups/immich-db-backup-*.sql.gz`
+from the restored files (see Immich's backup and restore docs).
+
 ### ArgoCD Ingress (argocd.blinde.net)
 
 ArgoCD is exposed via TLS passthrough rather than edge termination, so
