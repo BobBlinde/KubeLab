@@ -150,6 +150,46 @@ and `restic --insecure-no-password -r rclone:onedrive:kubelab-backups/immich res
 To get the database back, load the newest `backups/immich-db-backup-*.sql.gz`
 from the restored files (see Immich's backup and restore docs).
 
+### Paperless-ngx (paperless.blinde.net)
+
+`apps/paperless.yaml` deploys `manifests/paperless`: Paperless-ngx itself,
+plus its own Postgres and Valkey (the task broker Paperless requires).
+Data, media (the documents) and the consume folder are separate
+`local-path` PVCs.
+
+Paperless and its Postgres read their settings from a `paperless-secrets`
+secret that isn't stored in git. Create it before syncing the app:
+
+```bash
+kubectl create secret generic paperless-secrets \
+  --namespace paperless \
+  --from-literal=postgres-user=paperless \
+  --from-literal=postgres-password=YOUR_STRONG_PASSWORD \
+  --from-literal=postgres-db=paperless \
+  --from-literal=secret-key="$(python3 -c 'import secrets;print(secrets.token_urlsafe(64))')" \
+  --from-literal=admin-user=bob \
+  --from-literal=admin-password=YOUR_ADMIN_PASSWORD
+```
+
+`admin-user`/`admin-password` are only used to create the superuser on
+first start. Changing them later does nothing; change the password in
+Paperless instead. To read the initial password:
+
+```bash
+kubectl -n paperless get secret paperless-secrets -o jsonpath='{.data.admin-password}' | base64 -d
+```
+
+To import documents, copy them into the consume folder. Paperless picks
+them up, runs OCR, and removes them from the folder once imported:
+
+```bash
+kubectl -n paperless cp ./some-file.pdf deploy/paperless:/usr/src/paperless/consume/
+```
+
+OCR language is English (`PAPERLESS_OCR_LANGUAGE`). For Dutch documents
+set it to e.g. `nld+eng` and add `PAPERLESS_OCR_LANGUAGES=nld`, since the
+image doesn't ship Dutch by default.
+
 ### ArgoCD Ingress (argocd.blinde.net)
 
 ArgoCD is exposed via TLS passthrough rather than edge termination, so
