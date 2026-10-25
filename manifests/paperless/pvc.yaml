@@ -19,7 +19,9 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: local-path
+  # Bound to the hostPath PV in media-pv.yaml (/data/paperless/media).
+  storageClassName: manual
+  volumeName: paperless-media
   resources:
     requests:
       storage: 20Gi

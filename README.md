@@ -154,8 +154,12 @@ from the restored files (see Immich's backup and restore docs).
 
 `apps/paperless.yaml` deploys `manifests/paperless`: Paperless-ngx itself,
 plus its own Postgres and Valkey (the task broker Paperless requires).
-Data, media (the documents) and the consume folder are separate
-`local-path` PVCs.
+The documents (Paperless's media folder) live at `/data/paperless/media`
+on the node, wrapped in a static PV/PVC pair (`media-pv.yaml`,
+`storageClassName: manual`, `Retain`, pinned to `kubrick`) the same way
+as Immich's library. Data, the consume folder and Postgres are
+`local-path` PVCs. Paperless chowns its folders to UID 1000 on start, so
+`/data/paperless/media` doesn't need any preparation.
 
 Paperless and its Postgres read their settings from a `paperless-secrets`
 secret that isn't stored in git. Create it before syncing the app:
@@ -189,6 +193,28 @@ kubectl -n paperless cp ./some-file.pdf deploy/paperless:/usr/src/paperless/cons
 OCR language is English (`PAPERLESS_OCR_LANGUAGE`). For Dutch documents
 set it to e.g. `nld+eng` and add `PAPERLESS_OCR_LANGUAGES=nld`, since the
 image doesn't ship Dutch by default.
+
+### SilverBullet (silverbullet.blinde.net)
+
+`apps/silverbullet.yaml` deploys `manifests/silverbullet`: a single
+SilverBullet container whose space (the Markdown notes) lives at
+`/data/silverbullet` on the node, via a static PV/PVC pair (`pv.yaml`,
+`storageClassName: manual`, `Retain`, pinned to `kubrick`). SilverBullet
+runs as whoever owns that folder, so `chown 1000:1000 /data/silverbullet`
+on the node to stop it running as root.
+
+Login is configured through `SB_USER` (`user:password`), read from a
+`silverbullet-secrets` secret that isn't stored in git. Create it before
+syncing the app:
+
+```bash
+kubectl create secret generic silverbullet-secrets \
+  --namespace silverbullet \
+  --from-literal=sb-user=bob:YOUR_PASSWORD
+```
+
+Unlike Paperless's admin password, this one is read on every start, so to
+change it, update the secret and restart the deployment.
 
 ### ArgoCD Ingress (argocd.blinde.net)
 
