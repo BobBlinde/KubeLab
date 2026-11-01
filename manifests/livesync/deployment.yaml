@@ -15,6 +15,17 @@ spec:
       labels:
         app: livesync
     spec:
+      initContainers:
+        # The entrypoint chowns everything under /opt/couchdb and exits if that fails,
+        # which it does on a read-only ConfigMap mount, so copy the config to a writable dir
+        - name: config
+          image: couchdb:3.5.3
+          command: ["cp", "/config/livesync.ini", "/local.d/livesync.ini"]
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: local-d
+              mountPath: /local.d
       containers:
         - name: couchdb
           image: couchdb:3.5.3
@@ -46,10 +57,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /opt/couchdb/data
-            # Mounted as a single file so the entrypoint can still write docker.ini next to it
-            - name: config
-              mountPath: /opt/couchdb/etc/local.d/livesync.ini
-              subPath: livesync.ini
+            - name: local-d
+              mountPath: /opt/couchdb/etc/local.d
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -57,3 +66,5 @@ spec:
         - name: config
           configMap:
             name: livesync-couchdb
+        - name: local-d
+          emptyDir: {}
