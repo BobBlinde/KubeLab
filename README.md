@@ -194,28 +194,6 @@ OCR language is English (`PAPERLESS_OCR_LANGUAGE`). For Dutch documents
 set it to e.g. `nld+eng` and add `PAPERLESS_OCR_LANGUAGES=nld`, since the
 image doesn't ship Dutch by default.
 
-### SilverBullet (silverbullet.blinde.net)
-
-`apps/silverbullet.yaml` deploys `manifests/silverbullet`: a single
-SilverBullet container whose space (the Markdown notes) lives at
-`/data/silverbullet` on the node, via a static PV/PVC pair (`pv.yaml`,
-`storageClassName: manual`, `Retain`, pinned to `kubrick`). SilverBullet
-runs as whoever owns that folder, so `chown 1000:1000 /data/silverbullet`
-on the node to stop it running as root.
-
-Login is configured through `SB_USER` (`user:password`), read from a
-`silverbullet-secrets` secret that isn't stored in git. Create it before
-syncing the app:
-
-```bash
-kubectl create secret generic silverbullet-secrets \
-  --namespace silverbullet \
-  --from-literal=sb-user=bob:YOUR_PASSWORD
-```
-
-Unlike Paperless's admin password, this one is read on every start, so to
-change it, update the secret and restart the deployment.
-
 ### ArgoCD Ingress (argocd.blinde.net)
 
 ArgoCD is exposed via TLS passthrough rather than edge termination, so
