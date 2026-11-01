@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: livesync-data
+  namespace: livesync
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # Bound to the hostPath PV in pv.yaml (/data/livesync)
+  storageClassName: manual
+  volumeName: livesync-data
+  resources:
+    requests:
+      storage: 5Gi

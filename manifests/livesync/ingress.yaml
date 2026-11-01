@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: livesync
+  namespace: livesync
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - livesync.blinde.net
+      secretName: livesync-tls
+  rules:
+    - host: livesync.blinde.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: livesync
+                port:
+                  number: 80

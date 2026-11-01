@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livesync
+  namespace: livesync
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: livesync
+  template:
+    metadata:
+      labels:
+        app: livesync
+    spec:
+      containers:
+        - name: couchdb
+          image: couchdb:3.5.3
+          env:
+            # The entrypoint writes these to local.d/docker.ini on every start
+            - name: COUCHDB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: livesync-secrets
+                  key: couchdb-user
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: livesync-secrets
+                  key: couchdb-password
+          ports:
+            - name: http
+              containerPort: 5984
+          # TCP probes: every HTTP endpoint (including /_up) needs auth with require_valid_user
+          readinessProbe:
+            tcpSocket:
+              port: 5984
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5984
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            - name: data
+              mountPath: /opt/couchdb/data
+            # Mounted as a single file so the entrypoint can still write docker.ini next to it
+            - name: config
+              mountPath: /opt/couchdb/etc/local.d/livesync.ini
+              subPath: livesync.ini
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: livesync-data
+        - name: config
+          configMap:
+            name: livesync-couchdb

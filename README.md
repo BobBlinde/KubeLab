@@ -194,6 +194,41 @@ OCR language is English (`PAPERLESS_OCR_LANGUAGE`). For Dutch documents
 set it to e.g. `nld+eng` and add `PAPERLESS_OCR_LANGUAGES=nld`, since the
 image doesn't ship Dutch by default.
 
+### Self-hosted LiveSync for Obsidian (livesync.blinde.net)
+
+`apps/livesync.yaml` deploys `manifests/livesync`: a single-node CouchDB
+that the Obsidian [Self-hosted LiveSync](https://github.com/vrtmrz/obsidian-livesync)
+plugin syncs against. The databases live at `/data/livesync` on the node,
+via a static PV/PVC pair (`pv.yaml`, `storageClassName: manual`, `Retain`,
+pinned to `kubrick`).
+
+The CouchDB settings LiveSync needs (auth required everywhere, larger
+request and document limits, CORS for the Obsidian apps) are in
+`configmap.yaml`, mounted as `local.d/livesync.ini`. CouchDB only reads it
+at startup, so restart the deployment after changing it:
+
+```bash
+kubectl -n livesync rollout restart deploy/livesync
+```
+
+The admin account comes from a `livesync-secrets` secret that isn't stored
+in git. Create it before syncing the app:
+
+```bash
+kubectl create secret generic livesync-secrets \
+  --namespace livesync \
+  --from-literal=couchdb-user=bob \
+  --from-literal=couchdb-password=YOUR_PASSWORD
+```
+
+It's applied on every start, so to change it, update the secret and
+restart the deployment.
+
+In the plugin, use `https://livesync.blinde.net` as the server URI, the
+same username and password, and any database name (e.g. `obsidian`). The
+plugin creates the database itself. Turn on end-to-end encryption in the
+plugin with a passphrase, so the notes are stored encrypted in CouchDB.
+
 ### ArgoCD Ingress (argocd.blinde.net)
 
 ArgoCD is exposed via TLS passthrough rather than edge termination, so
