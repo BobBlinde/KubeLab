@@ -229,6 +229,32 @@ same username and password, and any database name (e.g. `obsidian`). The
 plugin creates the database itself. Turn on end-to-end encryption in the
 plugin with a passphrase, so the notes are stored encrypted in CouchDB.
 
+### Observability (grafana.blinde.net)
+
+`apps/prometheus.yaml` deploys `kube-prometheus-stack` (Prometheus,
+Grafana, node-exporter, kube-state-metrics) into the `observability`
+namespace. Like Immich, it's a multi-source Application: the chart plus
+`manifests/observability` for the Grafana `Certificate`.
+
+Prometheus keeps 30 days of metrics on a 20Gi `local-path` volume.
+`local-path` doesn't enforce the size, so `retentionSize: 18GB` is what
+actually stops it filling the node's disk.
+
+The k3s control-plane scrapers (controller manager, scheduler, kube-proxy,
+etcd) are disabled: k3s runs them inside its own process, so the chart's
+default endpoints are unreachable and would fire `TargetDown` forever.
+
+Grafana's admin login comes from a `grafana-admin` secret that isn't stored
+in git. Create it before syncing:
+
+```bash
+kubectl create namespace observability
+kubectl create secret generic grafana-admin \
+  --namespace observability \
+  --from-literal=admin-user=admin \
+  --from-literal=admin-password=YOUR_STRONG_PASSWORD
+```
+
 ### ArgoCD Ingress (argocd.blinde.net)
 
 ArgoCD is exposed via TLS passthrough rather than edge termination, so

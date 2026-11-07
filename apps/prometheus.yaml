@@ -7,14 +7,67 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  source:
-    repoURL: oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
-    path: "."
-    targetRevision: "92.22.0"
-    helm:
-      values: |
-        crds:
-          enabled: true
+
+  sources:
+    - repoURL: oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
+      path: "."
+      targetRevision: "92.22.0"
+      helm:
+        values: |
+          crds:
+            enabled: true
+
+          # k3s embeds these in the k3s process, so the chart's default
+          # endpoints are unreachable and they'd fire TargetDown forever.
+          kubeControllerManager:
+            enabled: false
+          kubeScheduler:
+            enabled: false
+          kubeProxy:
+            enabled: false
+          kubeEtcd:
+            enabled: false
+
+          prometheus:
+            prometheusSpec:
+              retention: 30d
+              retentionSize: 18GB
+              storageSpec:
+                volumeClaimTemplate:
+                  spec:
+                    storageClassName: local-path
+                    accessModes:
+                      - ReadWriteOnce
+                    resources:
+                      requests:
+                        storage: 20Gi
+
+              # Pick up monitors/rules from every namespace, not just ones
+              # labelled with this Helm release.
+              serviceMonitorSelectorNilUsesHelmValues: false
+              podMonitorSelectorNilUsesHelmValues: false
+              ruleSelectorNilUsesHelmValues: false
+              probeSelectorNilUsesHelmValues: false
+              scrapeConfigSelectorNilUsesHelmValues: false
+
+          grafana:
+            admin:
+              existingSecret: grafana-admin
+              userKey: admin-user
+              passwordKey: admin-password
+            ingress:
+              enabled: true
+              ingressClassName: traefik
+              hosts:
+                - grafana.blinde.net
+              tls:
+                - secretName: grafana-tls
+                  hosts:
+                    - grafana.blinde.net
+
+    - repoURL: https://github.com/BobBlinde/KubeLab.git
+      targetRevision: main
+      path: manifests/observability
 
   destination:
     server: https://kubernetes.default.svc
