@@ -255,6 +255,29 @@ kubectl create secret generic grafana-admin \
   --from-literal=admin-password=YOUR_STRONG_PASSWORD
 ```
 
+#### Logs (Loki, Alloy)
+
+Two more Applications deploy into the same `observability` namespace:
+
+- `apps/loki.yaml`: Loki as a single binary (`deploymentMode: Monolithic`),
+  with chunks and index on a 20Gi `local-path` volume. Logs are kept for
+  30 days (`retention_period: 720h`, enforced by the compactor). Unlike
+  Prometheus, Loki has no size-based retention, so watch the disk if
+  something gets chatty.
+- `apps/alloy.yaml`: Grafana Alloy as a DaemonSet. It tails every
+  container's logs from `/var/log/pods` on its node and pushes them to
+  Loki with `namespace`, `pod`, `container`, `node` and `app` labels.
+
+Loki comes from the `grafana-community` chart repo. The `loki` chart in
+`grafana/helm-charts` is now the Grafana Enterprise Logs chart.
+
+Grafana gets a `Loki` datasource via `grafana.additionalDataSources` in
+`apps/prometheus.yaml`. No secrets or manual steps needed.
+
+There's no Tempo (tracing) yet, because nothing in the cluster emits
+traces. If that changes, the first candidate is k3s's Traefik, which can
+export OTLP traces for every ingress request.
+
 ### ArgoCD Ingress (argocd.blinde.net)
 
 ArgoCD is exposed via TLS passthrough rather than edge termination, so

@@ -51,6 +51,12 @@ spec:
               scrapeConfigSelectorNilUsesHelmValues: false
 
           grafana:
+            additionalDataSources:
+              - name: Loki
+                type: loki
+                uid: loki
+                url: http://loki.observability.svc:3100
+
             admin:
               existingSecret: grafana-admin
               userKey: admin-user
